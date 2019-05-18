@@ -4,7 +4,7 @@
   <parent>
     <groupId>com.itemis</groupId>
     <artifactId>org-parent</artifactId>
-    <version>1</version>
+    <version>3</version>
   </parent>
 
   <groupId>com.itemis.maven.plugins</groupId>
@@ -39,11 +39,11 @@
 
   <properties>
     <version.guava>19.0</version.guava>
-    <version.java>1.6</version.java>
+    <version.java>1.8</version.java>
     <version.junit>4.12</version.junit>
     <version.junit-dataprovider>1.10.3</version.junit-dataprovider>
-    <version.unleash-scm-provider-api>2.4.1</version.unleash-scm-provider-api>
-    <version.svnkit>1.8.12</version.svnkit>
+    <version.unleash-scm-provider-api>2.9.3</version.unleash-scm-provider-api>
+    <version.svnkit>1.9.3</version.svnkit>
   </properties>
 
   <dependencies>

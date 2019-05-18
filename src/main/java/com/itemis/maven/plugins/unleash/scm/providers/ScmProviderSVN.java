@@ -6,11 +6,12 @@ import java.util.Collections;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import org.apache.commons.lang3.StringUtils;
 import org.tmatesoft.svn.core.SVNCommitInfo;
 import org.tmatesoft.svn.core.SVNDepth;
 import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.SVNURL;
+import org.tmatesoft.svn.core.auth.ISVNAuthenticationManager;
+import org.tmatesoft.svn.core.internal.wc.DefaultSVNAuthenticationManager;
 import org.tmatesoft.svn.core.internal.wc.DefaultSVNOptions;
 import org.tmatesoft.svn.core.wc.SVNClientManager;
 import org.tmatesoft.svn.core.wc.SVNCommitClient;
@@ -79,12 +80,20 @@ public class ScmProviderSVN implements ScmProvider {
     this.log = initialization.getLogger().or(Logger.getLogger(ScmProvider.class.getName()));
 
     if (initialization.getUsername().isPresent()) {
-      this.clientManager = SVNClientManager.newInstance(null, initialization.getUsername().get(),
-          initialization.getPassword().or(StringUtils.EMPTY));
+    	ISVNAuthenticationManager authManager = new DefaultSVNAuthenticationManager(null, true,
+				initialization.getUsername().get(),
+				toCharArray(initialization.getPassword()),
+				initialization.getSshPrivateKey().transform(filename -> new File(filename)).orNull(),
+				toCharArray(initialization.getSshPrivateKeyPassphrase()));
+    	this.clientManager = SVNClientManager.newInstance(null, authManager);
     } else {
       this.clientManager = SVNClientManager.newInstance();
     }
     this.util = new SVNUtil(this.clientManager, this.workingDir);
+  }
+
+  protected char[] toCharArray(Optional<String> stringOptional) {
+	return stringOptional.transform(string -> string.toCharArray()).or(new char[0]);
   }
 
   private void disableKeyring() {
