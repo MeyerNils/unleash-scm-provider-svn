@@ -1,8 +1,17 @@
 package com.itemis.maven.plugins.unleash.scm.providers;
 
 import java.io.File;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.attribute.FileAttribute;
+import java.nio.file.attribute.PosixFilePermission;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -62,7 +71,10 @@ import com.itemis.maven.plugins.unleash.scm.results.HistoryResult;
 
 @ScmProviderType("svn")
 public class ScmProviderSVN implements ScmProvider {
+  private static final String DEFAULT_SSH_FOLDER_NAME = ".ssh";
   private static final String LOG_PREFIX = "SVN - ";
+  private static final String PRIVATE_KEY_FILE_PREFIX = "unleash_privateKey_";
+  private static final FileAttribute<Set<PosixFilePermission>> READ_WRITE_USER_ONLY_PERMISSIONS = PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rw-------"));
   private SVNClientManager clientManager;
   private File workingDir;
   private SVNUtil util;
@@ -83,7 +95,14 @@ public class ScmProviderSVN implements ScmProvider {
     	ISVNAuthenticationManager authManager = new DefaultSVNAuthenticationManager(null, true,
 				initialization.getUsername().get(),
 				toCharArray(initialization.getPassword()),
-				initialization.getSshPrivateKey().transform(filename -> new File(filename)).orNull(),
+				null,
+				null);
+    	this.clientManager = SVNClientManager.newInstance(null, authManager);
+    } else if (initialization.getSshPrivateKey().isPresent()) {
+    	ISVNAuthenticationManager authManager = new DefaultSVNAuthenticationManager(null, true,
+    			System.getProperty("user.name"),
+				null,
+				writePrivateKeyFile(initialization),
 				toCharArray(initialization.getSshPrivateKeyPassphrase()));
     	this.clientManager = SVNClientManager.newInstance(null, authManager);
     } else {
@@ -92,8 +111,27 @@ public class ScmProviderSVN implements ScmProvider {
     this.util = new SVNUtil(this.clientManager, this.workingDir);
   }
 
+  private File writePrivateKeyFile(ScmProviderInitialization initialization) {
+	String privateKeyFilename = PRIVATE_KEY_FILE_PREFIX + System.getProperty("user.name");
+	try {
+	  Path dotSshFolder = Paths.get(System.getProperty("user.home"), DEFAULT_SSH_FOLDER_NAME);
+	  if (Files.notExists(dotSshFolder)) {
+		Files.createDirectory(dotSshFolder, READ_WRITE_USER_ONLY_PERMISSIONS);
+	  }
+	  Path privateKeyFilePath = dotSshFolder.resolve(privateKeyFilename);
+	  if (Files.notExists(privateKeyFilePath)) {
+	    Files.createFile(privateKeyFilePath, READ_WRITE_USER_ONLY_PERMISSIONS);
+	  }
+  	  Files.write(privateKeyFilePath, initialization.getSshPrivateKey().get().getBytes(StandardCharsets.UTF_8));
+	  return privateKeyFilePath.toFile();
+	} catch (IOException e) {
+	  log.log(Level.SEVERE, "Could not write privateKey file " + privateKeyFilename + ": " + e.getMessage(), e);
+	}
+	return null;
+  }
+
   protected char[] toCharArray(Optional<String> stringOptional) {
-	return stringOptional.transform(string -> string.toCharArray()).or(new char[0]);
+	return stringOptional.transform(String::toCharArray).or(new char[0]);
   }
 
   private void disableKeyring() {
@@ -712,5 +750,4 @@ public class ScmProviderSVN implements ScmProvider {
 
     return resultBuilder.build();
   }
-
 }
